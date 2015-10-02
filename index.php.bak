@@ -1,0 +1,143 @@
+<?
+
+include_once(dirname(__FILE__) . "/first.php");
+
+
+//$db->kiosk_sound = $db->common_sound_url . "/success.mp3";
+
+switch($accounts->computer_record->library_kiosk)
+{
+	case "Y":
+		//$db->show_search = FALSE;
+
+		if($_SESSION['library_account_ID'] > 0)
+		{
+			$db->kiosk_message = ucwords($db->entry_mode_caption_present_tense) . " books. &nbsp; " . ucwords($db->entry_mode_caption_present_tense) . " library card when done.";
+		}
+		else
+		{
+			$db->kiosk_message = ucwords($db->entry_mode_caption_present_tense) . " your library card.";
+		}; // end if
+
+		include_once(dirname(__FILE__) . "/top.php");
+
+		if($_SESSION['library_account_ID'] > 0)
+		{
+			if($_SESSION['return_mode'])
+			{
+				?><div class="action_bar"><span class="action_instructions">Scan items to return.</span></div><?
+			}
+			else
+			{
+				if($db->item_overdue_count > $accounts->account_record->library_item_overdue_limit && $accounts->account_record->library_item_overdue_limit >= 0)
+				{
+					?><div class="action_bar"><span class="action_warning">You have too many overdue items.  You must return them before you can checkout more.</span></div><?
+				}
+				else
+				{
+					if($db->item_checked_out_count >= $accounts->account_record->library_item_limit)
+					{
+						?><div class="action_bar"><span class="action_warning">You may only checkout <?= $accounts->account_record->library_item_limit; ?> item<?= ($accounts->account_record->library_item_limit != 0 ? "s" : ""); ?> at a time.  You must return some before you can checkout more.</span></div><?
+					}
+					else
+					{
+						?><div class="action_bar"><span class="action_instructions">Scan items to checkout.</span></div><?
+					}; // end if
+				}; // end if
+
+
+				$checkout_sql = "
+					SELECT
+						*
+					FROM
+						`" . $db->table_library_checkout . "`
+					WHERE
+						`" . $db->field_account_ID . "`='" . $_SESSION['library_account_ID'] . "'
+						AND `in_datetime`='" . $db->blank_datetime . "'
+				";
+				$checkout_result = mysql_query($checkout_sql, $mysql->link);
+
+				if(mysql_num_rows($checkout_result) > 0)
+				{
+					?><h1>Currently Checked Out</h1><?
+
+					while($checkout_record = mysql_fetch_object($checkout_result))
+					{
+						$item_sql = "
+							SELECT
+								*
+							FROM
+								`" . $db->table_library_item . "`
+							WHERE
+								`ID`='" . $checkout_record->item_ID . "'
+						";
+						$item_result = mysql_query($item_sql, $mysql->link);
+						$item_record = mysql_fetch_object($item_result);
+
+						?><div><?= $item_record->title; ?> <span class="small">- due <?= sql_date_format("F jS, Y", $checkout_record->due_datetime); ?></span><?
+
+						if($checkout_record->due_datetime < date("Y-m-d H:i:s"))
+						{
+							?> - <span class="error_highlighted">OVERDUE</span><?
+						}; // end if
+
+						?></div><?
+
+					}; // end while
+				}; // end if
+
+				?><h1>Account Info</h1><?
+
+				?><div>Checkout Length: <b><?= $accounts->account_record->library_checkout_length_read; ?> days</b></div><?
+				?><div>Checkout Limit: <b><?= $accounts->account_record->library_item_limit; ?> item<?= ($accounts->account_record->library_item_limit != 1 ? "s" : ""); ?></b></div><?
+				?><div>Overdue Limit: <b><?= $accounts->account_record->library_item_overdue_limit; ?> item<?= ($accounts->account_record->library_item_overdue_limit != 1 ? "s" : ""); ?></b></div><?
+
+				?><div class="action_bar"><span class="action_status_success"><b><?= ($accounts->account_record->library_award_points - $accounts->account_record->library_award_spent); ?></b> reading award points.</span></div><?
+
+			}; // end if
+
+
+		}; // end if
+
+
+
+		include_once(dirname(__FILE__) . "/bottom.php");
+		break;
+	default:
+		include_once(dirname(__FILE__) . "/top.php");
+		?>
+		<h3>Special Searches</h3>
+		<?
+		?>
+		<div><a href="<?= $db->url_root; ?>/search.php/special/multiplecopies">Items with multiple copies</a></div>
+		<div><a href="<?= $db->url_root; ?>/search.php/special/compilations">Compilations</a></div>
+		<br>
+		<div>Items checked out by: <?
+			$group_sql = "
+				SELECT
+					*
+				FROM
+					`" . $db->table_group . "`
+				WHERE
+					`account_ID`='" . $accounts->account_record->ID . "'
+					AND `enabled`='Y'
+			";
+			$group_result = mysql_query($group_sql, $mysql->link);
+			while($group_record = mysql_fetch_object($group_result))
+			{
+				?><a href="<?= $db->url_root; ?>/group_checked_out.php/<?= $group_record->ID; ?>"><?= $group_record->title; ?></a>, <?
+			}; // end while
+			if(! $first)
+			{
+				?>, <?
+			}; // end if
+?><a href="<?= $db->url_root; ?>/search.php/special/checkedout">Everyone</a><?
+		?></div><?
+		include_once(dirname(__FILE__) . "/bottom.php");
+		break;
+}; // end switch
+
+
+exit();
+
+?>
